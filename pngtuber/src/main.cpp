@@ -10,9 +10,18 @@
 #include <QPixmap>
 #include <QSystemTrayIcon>
 
-// Icono generado en código para no depender de un archivo de recursos.
-static QIcon buildTrayIcon()
+// Icono de la aplicación. Viene incrustado en el ejecutable (resources/icon.qrc);
+// si por lo que sea faltara, se dibuja uno de emergencia en código.
+static QIcon buildAppIcon()
 {
+    // El arte es pixel-art: se carga una imagen por tamaño en vez de dejar que
+    // Qt reescale una sola grande, que lo emborronaría.
+    QIcon icon;
+    for (int size : { 16, 24, 32, 48, 64, 128, 256 })
+        icon.addFile(QStringLiteral(":/icons/icon-%1.png").arg(size), QSize(size, size));
+    if (!icon.availableSizes().isEmpty())
+        return icon;
+
     QPixmap pm(64, 64);
     pm.fill(Qt::transparent);
     QPainter p(&pm);
@@ -34,7 +43,11 @@ int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
     app.setApplicationName(QStringLiteral("PngtuberDesktop"));
+    app.setApplicationDisplayName(QStringLiteral("PNGTuber Desktop"));
     app.setQuitOnLastWindowClosed(false); // vive en la bandeja
+
+    const QIcon appIcon = buildAppIcon();
+    app.setWindowIcon(appIcon);
 
     AppConfig config = AppConfig::load();
 
@@ -61,7 +74,7 @@ int main(int argc, char *argv[])
     window.refreshFromConfig();
     config.save(); // deja el archivo creado ya en el primer arranque
 
-    QSystemTrayIcon tray(buildTrayIcon());
+    QSystemTrayIcon tray(appIcon);
     tray.setToolTip(QStringLiteral("PNGTuber de escritorio"));
 
     QMenu trayMenu;

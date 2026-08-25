@@ -1,0 +1,14 @@
+<!DOCTYPE RCC>
+<RCC version="1.0">
+  <qresource prefix="/icons">
+    <!-- Una imagen por tamaño: el arte es pixel-art y reescalarlo desde una
+         sola imagen grande lo emborrona. -->
+    <file>icon-16.png</file>
+    <file>icon-24.png</file>
+    <file>icon-32.png</file>
+    <file>icon-48.png</file>
+    <file>icon-64.png</file>
+    <file>icon-128.png</file>
+    <file>icon-256.png</file>
+  </qresource>
+</RCC>

@@ -4,11 +4,17 @@
 
 #include <QGuiApplication>
 #include <QScreen>
+#include <QTimer>
 
 namespace {
 constexpr int kIdClickThrough = -1;
 constexpr int kIdVisibility = -2;
 constexpr int kVariationsPerProfile = 1000;
+
+// Cada cuánto se recoloca el overlay en el orden Z. La barra de tareas se
+// reposiciona sola cada vez que recibe el foco, así que hace falta insistir
+// para que el PNGTuber no vuelva a aparecer por delante de ella.
+constexpr int kStackingIntervalMs = 400;
 }
 
 OverlayController::OverlayController(AppConfig *config, QObject *parent)
@@ -21,6 +27,31 @@ OverlayController::OverlayController(AppConfig *config, QObject *parent)
 
     connect(qApp, &QGuiApplication::screenAdded, this, &OverlayController::onScreensChanged);
     connect(qApp, &QGuiApplication::screenRemoved, this, &OverlayController::onScreensChanged);
+
+    m_stackTimer = new QTimer(this);
+    m_stackTimer->setInterval(kStackingIntervalMs);
+    connect(m_stackTimer, &QTimer::timeout, this, &OverlayController::refreshStacking);
+    m_stackTimer->start();
+}
+
+void OverlayController::setStackReference(WId reference)
+{
+    if (m_stackReference == reference)
+        return;
+    m_stackReference = reference;
+    refreshStacking();
+}
+
+void OverlayController::refreshStacking()
+{
+    if (!m_visible)
+        return;
+    for (Instance &inst : m_instances) {
+        if (!inst.window)
+            continue;
+        inst.window->setStackReference(m_stackReference);
+        inst.window->applyStacking();
+    }
 }
 
 int OverlayController::encodeId(int profileIndex, int variationIndex)
@@ -87,6 +118,7 @@ void OverlayController::rebuildOverlays()
         connect(window, &OverlayWindow::settingsRequested,
                 this, &OverlayController::settingsRequested);
 
+        window->setStackReference(m_stackReference);
         window->applyProfile(*profile);
         if (!m_visible)
             window->hide();
@@ -200,7 +232,7 @@ void OverlayController::setOverlaysVisible(bool visible)
             continue;
         if (visible) {
             inst.window->show();
-            inst.window->raise();
+            inst.window->applyStacking();
         } else {
             inst.window->hide();
         }

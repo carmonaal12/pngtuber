@@ -8,12 +8,17 @@ Consumo típico: ~35-60 MB de RAM y prácticamente 0 % de CPU en reposo.
 
 ## Qué hace
 
-- Ventana de configuración al arrancar; luego vive en la bandeja del sistema.
+- Ventana de configuración al arrancar; luego vive en la bandeja del sistema con el
+  icono del personaje.
 - GIF animado con canal alfa, siempre encima, sin bordes ni sombra.
 - Escala del 10 % al 400 % y opacidad regulable.
+- El PNGTuber se dibuja siempre **por detrás de la barra de tareas** y por
+  delante del resto de ventanas, sin necesidad de hacer clic en la barra.
 - Anclaje relativo a la barra de tareas: al principio, al centro o al final, y
-  apoyado encima de la barra, centrado dentro de ella o pegado al borde de la
-  pantalla. Más un ajuste fino en píxeles.
+  apoyado encima de la barra o pegado al borde de la pantalla. Más un ajuste
+  fino con dos barras deslizantes (X e Y).
+- La ventana de configuración queda siempre por encima del overlay mientras
+  está abierta.
 - Variaciones ilimitadas, cada una con su GIF, su atajo global y su modo:
   - **Conmutar**: se pulsa y la variación se queda fija hasta pulsarla de nuevo.
   - **Mantener**: se muestra sólo mientras la tecla está pulsada.
@@ -84,16 +89,24 @@ macdeployqt build/pngtuber.app
 ### Prueba funcional
 
 ```bash
-cmake -B build -DBUILD_TESTS=ON && cmake --build build --target geometry_test
-QT_QPA_PLATFORM=offscreen ./build/geometry_test
+cmake -B build -DBUILD_TESTS=ON && cmake --build build -j
+QT_QPA_PLATFORM=offscreen ./build/geometry_test   # necesita un GIF en /tmp/test.gif
+QT_QPA_PLATFORM=offscreen ./build/ui_test
 ```
 
-Verifica el escalado, el anclaje, el cambio de variación y el click-through.
+`geometry_test` verifica el escalado, el anclaje, el cambio de variación y el
+click-through. `ui_test` comprueba la ventana de configuración: que la escala
+arranque en 100 %, que el ajuste fino sean barras deslizantes y que los perfiles
+nuevos aparezcan al momento en la pestaña de monitores. La CI de Windows ejecuta
+`ui_test` en cada compilación.
 
 ## Uso
 
 1. Abre la pestaña **Perfiles** y elige el GIF base (el de reposo).
 2. Ajusta escala y posición. El overlay se actualiza mientras mueves el deslizador.
+   La escala arranca en 100 % (tamaño original del GIF) y el ajuste fino son dos
+   barras deslizantes: las flechas del teclado mueven de píxel en píxel y el
+   botón «0» vuelve al anclaje.
 3. En **Variaciones y atajos**, añade una entrada por cada GIF alternativo: nombre,
    archivo, atajo y modo. El campo de atajo captura la combinación que pulses.
 4. En **Monitores**, marca en qué pantallas quieres el overlay y con qué perfil.
@@ -125,8 +138,11 @@ Monitorización de entrada para que funcionen los atajos globales. Ten en cuenta
 que Qt intercambia Ctrl y Cmd en macOS: lo que grabes como `Ctrl+Alt+1` se
 registra como Cmd+Option+1.
 
-**Windows.** Sin limitaciones relevantes. Si `Win+D` (mostrar escritorio) deja el
-overlay detrás, `Ctrl+Alt+H` dos veces lo devuelve al frente.
+**Windows.** Sin limitaciones relevantes. El orden de ventanas se mantiene con un
+temporizador de 400 ms que recoloca el overlay justo por debajo de la barra de
+tareas (`Shell_TrayWnd`), porque la barra se reposiciona sola cada vez que recibe
+el foco. Si `Win+D` (mostrar escritorio) deja el overlay detrás, `Ctrl+Alt+H` dos
+veces lo devuelve al frente.
 
 **Atajos ya ocupados.** Si otro programa tiene registrada la misma combinación, el
 sistema rechaza el registro. La ventana de configuración lo avisa abajo, en naranja,
@@ -143,6 +159,8 @@ indicando qué atajos han fallado.
 | `keystate.h/.cpp` | Sondeo del estado físico de una tecla, para el modo "mantener" |
 | `configwindow.h/.cpp` | Interfaz de configuración |
 | `main.cpp` | Arranque, bandeja del sistema y cableado |
+| `resources/` | Icono: `icon-NN.png` (uno por tamaño, Qt resource) e `icon.ico` (recurso nativo de Windows) |
+| `docs/Guia-de-uso.pdf` | Manual de usuario que se empaqueta con el instalador |
 
 Sin dependencias externas más allá de Qt y, en Linux, libX11.
 

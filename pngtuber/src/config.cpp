@@ -50,7 +50,6 @@ QString barModeToString(BarMode m)
 {
     switch (m) {
     case BarMode::Above:  return QStringLiteral("above");
-    case BarMode::On:     return QStringLiteral("on");
     case BarMode::Screen: return QStringLiteral("screen");
     }
     return QStringLiteral("above");
@@ -58,9 +57,22 @@ QString barModeToString(BarMode m)
 
 BarMode barModeFromString(const QString &s)
 {
-    if (s == "on")     return BarMode::On;
     if (s == "screen") return BarMode::Screen;
+    // "on" es un modo antiguo (centrado dentro de la barra) que ya no existe:
+    // las configuraciones viejas pasan a apoyarse sobre la barra.
     return BarMode::Above;
+}
+
+// Devuelve el porcentaje de escala saneado: cualquier valor ausente, corrupto
+// o fuera de rango vuelve al 100 %.
+int sanitizeScale(const QJsonValue &value)
+{
+    if (!value.isDouble())
+        return kScaleDefault;
+    const int scale = value.toInt(kScaleDefault);
+    if (scale < kScaleMin || scale > kScaleMax)
+        return kScaleDefault;
+    return scale;
 }
 
 } // namespace
@@ -93,13 +105,15 @@ AppConfig AppConfig::load()
         Profile p;
         p.name = po["name"].toString();
         p.idleGif = po["idleGif"].toString();
-        p.scalePercent = po["scale"].toInt(100);
+        p.scalePercent = sanitizeScale(po["scale"]);
         p.align = alignFromString(po["align"].toString());
         p.barMode = barModeFromString(po["barMode"].toString());
         p.offsetX = po["offsetX"].toInt(0);
         p.offsetY = po["offsetY"].toInt(0);
         p.clickThrough = po["clickThrough"].toBool(true);
-        p.opacityPercent = po["opacity"].toInt(100);
+        p.opacityPercent = qBound(5, po["opacity"].toInt(100), 100);
+        if (p.name.trimmed().isEmpty())
+            p.name = QStringLiteral("Perfil %1").arg(cfg.profiles.size() + 1);
         const QJsonArray vars = po["variations"].toArray();
         for (const QJsonValue &vv : vars)
             p.variations.append(variationFromJson(vv.toObject()));

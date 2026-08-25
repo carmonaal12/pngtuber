@@ -27,6 +27,14 @@ public:
 
     QScreen *targetScreen() const { return m_screen; }
 
+    // Ventana que debe quedar justo por encima del overlay (la de ajustes).
+    // Con 0 el overlay se coloca por debajo de la barra de tareas y por encima
+    // del resto de ventanas.
+    void setStackReference(WId reference);
+
+    // Recoloca el overlay en el orden Z según la referencia actual.
+    void applyStacking();
+
 signals:
     // El usuario ha arrastrado el overlay: nuevos desplazamientos respecto al anclaje.
     void dragged(int offsetX, int offsetY);
@@ -53,6 +61,7 @@ private:
     Profile m_profile;
     int m_currentVariation = -1;
     bool m_clickThrough = true;
+    WId m_stackReference = 0;
 
     bool m_dragging = false;
     QPoint m_dragStartGlobal;

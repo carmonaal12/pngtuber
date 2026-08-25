@@ -41,8 +41,24 @@ jobs:
         shell: pwsh
         run: |
           cmake -B build -G "Visual Studio 17 2022" -A x64 `
-                -DCMAKE_PREFIX_PATH="$env:QT_DIR"
+                -DCMAKE_PREFIX_PATH="$env:QT_DIR" -DBUILD_TESTS=ON
           cmake --build build --config Release --parallel
+
+      - name: Pasar las pruebas de la interfaz
+        shell: pwsh
+        run: |
+          $env:PATH = "$env:QT_DIR\bin;$env:PATH"
+          & build\Release\ui_test.exe
+          if ($LASTEXITCODE -ne 0) {
+            # Segundo intento sin escritorio, por si el runner no tiene sesión gráfica.
+            Write-Host "Reintentando con la plataforma offscreen..."
+            $env:QT_QPA_PLATFORM = "offscreen"
+            & build\Release\ui_test.exe
+            if ($LASTEXITCODE -ne 0) {
+              Write-Error "Las pruebas de la interfaz han fallado."
+              exit 1
+            }
+          }
 
       - name: Empaquetar con las DLL de Qt
         shell: pwsh
@@ -50,6 +66,9 @@ jobs:
           New-Item -ItemType Directory -Force -Path dist\PngtuberDesktop | Out-Null
           Copy-Item build\Release\pngtuber.exe dist\PngtuberDesktop\
           Copy-Item README.md dist\PngtuberDesktop\LEEME.md
+          if (Test-Path docs\Guia-de-uso.pdf) {
+            Copy-Item docs\Guia-de-uso.pdf dist\PngtuberDesktop\
+          }
           & "$env:QT_DIR\bin\windeployqt.exe" `
               --release --no-translations --no-system-d3d-compiler --no-opengl-sw `
               dist\PngtuberDesktop\pngtuber.exe

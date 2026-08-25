@@ -1,0 +1,8 @@
+# Normaliza los finales de línea en el repositorio: así el árbol de trabajo de
+# Windows (CRLF) no aparece como "todo modificado" al hacer git status.
+* text=auto
+
+*.png binary
+*.ico binary
+*.pdf binary
+*.gif binary

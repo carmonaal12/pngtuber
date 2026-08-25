@@ -8,7 +8,7 @@
 #endif
 
 #define MyAppName "PNGTuber Desktop"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "1.1.0"
 #define MyAppExeName "pngtuber.exe"
 
 [Setup]
@@ -20,6 +20,8 @@ DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 UninstallDisplayIcon={app}\{#MyAppExeName}
 OutputBaseFilename=PngtuberDesktop-Setup
+; Ruta relativa a la carpeta de este .iss (pngtuber\installer).
+SetupIconFile=..\resources\icon.ico
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
@@ -42,6 +44,7 @@ Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdi
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
+Name: "{group}\Guía de uso (PDF)"; Filename: "{app}\Guia-de-uso.pdf"; Check: FileExists(ExpandConstant('{app}\Guia-de-uso.pdf'))
 Name: "{group}\Desinstalar {#MyAppName}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 Name: "{userstartup}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: startupicon

@@ -1,0 +1,502 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>PNGTuber Desktop — Guía de uso</title>
+<style>
+  @page { size: A4; margin: 0; }
+
+  :root {
+    --ink:      #1b1f2a;
+    --muted:    #6b7280;
+    --line:     #e3e6ee;
+    --accent:   #4c6ef5;
+    --accent-d: #3552c9;
+    --soft:     #f4f6fc;
+    --warn:     #b34700;
+    --warn-bg:  #fff6ec;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: "Inter", "Carlito", "Liberation Sans", sans-serif;
+    color: var(--ink);
+    font-size: 10.2pt;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page {
+    width: 210mm;
+    height: 297mm;
+    padding: 18mm 18mm 14mm;
+    position: relative;
+    page-break-after: always;
+    overflow: hidden;
+  }
+  .page:last-child { page-break-after: auto; }
+
+  /* ---------- Portada ---------- */
+  .cover {
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .cover-band {
+    background: linear-gradient(140deg, #4c6ef5 0%, #6b46e5 55%, #8b3fd9 100%);
+    color: #fff;
+    padding: 19mm 18mm 11mm;
+  }
+  .badge {
+    display: inline-block;
+    font-size: 8.5pt;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    font-weight: 600;
+    border: 1px solid rgba(255,255,255,.55);
+    border-radius: 100px;
+    padding: 4px 12px;
+    margin-bottom: 10mm;
+  }
+  .cover h1 {
+    font-size: 30pt;
+    line-height: 1.05;
+    margin: 0 0 5mm;
+    font-weight: 700;
+    letter-spacing: -.02em;
+  }
+  .cover .sub {
+    font-size: 12.5pt;
+    max-width: 118mm;
+    opacity: .93;
+    margin: 0;
+    font-weight: 400;
+  }
+  .cover-body { padding: 8mm 18mm; flex: 1; }
+
+  /* ---------- Tipografía ---------- */
+  h2 {
+    font-size: 15.5pt;
+    margin: 0 0 3.5mm;
+    font-weight: 700;
+    letter-spacing: -.01em;
+  }
+  h2 .num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px; height: 22px;
+    border-radius: 7px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 10.5pt;
+    margin-right: 8px;
+    vertical-align: 2px;
+  }
+  h3 {
+    font-size: 11pt;
+    margin: 6mm 0 2mm;
+    font-weight: 650;
+  }
+  p { margin: 0 0 3.2mm; }
+  .lead { color: var(--muted); margin-bottom: 5mm; }
+  strong { font-weight: 650; }
+
+  ol, ul { margin: 0 0 4mm; padding-left: 5.5mm; }
+  li { margin-bottom: 2mm; }
+
+  /* ---------- Piezas ---------- */
+  .key {
+    display: inline-block;
+    font-family: "Inter", sans-serif;
+    font-size: 8.6pt;
+    font-weight: 600;
+    background: #fff;
+    border: 1px solid #cfd4e2;
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 1px 6px;
+    white-space: nowrap;
+  }
+  .ui {
+    font-weight: 600;
+    color: var(--accent-d);
+  }
+
+  .card {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 4mm 5mm;
+    background: #fff;
+  }
+  .card + .card { margin-top: 4mm; }
+  .soft { background: var(--soft); border-color: #dde3f7; }
+
+  .note {
+    border-left: 3px solid var(--accent);
+    background: var(--soft);
+    border-radius: 0 8px 8px 0;
+    padding: 3.2mm 4.5mm;
+    margin: 3.5mm 0 0;
+    font-size: 9.6pt;
+  }
+  .note.warn { border-left-color: var(--warn); background: var(--warn-bg); }
+  .note b { display: block; margin-bottom: 1mm; }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 5mm; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 9.6pt; }
+  th, td { text-align: left; padding: 2.2mm 3mm; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-weight: 650; color: var(--muted); font-size: 8.6pt; text-transform: uppercase; letter-spacing: .05em; }
+  tr:last-child td { border-bottom: none; }
+
+  /* ---------- Maqueta de la ventana ---------- */
+  .mock {
+    border: 1px solid #c8cee0;
+    border-radius: 9px;
+    overflow: hidden;
+    font-size: 8.4pt;
+    background: #fdfdff;
+  }
+  .mock-bar {
+    background: #eef1f8;
+    border-bottom: 1px solid #d9dfef;
+    padding: 2mm 3mm;
+    font-weight: 600;
+    color: #4a5168;
+  }
+  .mock-tabs { display: flex; gap: 1.5mm; padding: 2mm 3mm 0; }
+  .mock-tab {
+    padding: 1.4mm 3.5mm;
+    border: 1px solid #d9dfef;
+    border-bottom: none;
+    border-radius: 6px 6px 0 0;
+    background: #f2f4fb;
+    color: #666e88;
+  }
+  .mock-tab.on { background: #fff; color: var(--accent-d); font-weight: 650; }
+  .mock-body { border-top: 1px solid #d9dfef; padding: 3mm; display: grid; grid-template-columns: 36mm 1fr; gap: 4mm; }
+  .mock-list { border: 1px solid #dfe4f2; border-radius: 6px; padding: 2mm; background: #fff; }
+  .mock-list div { padding: 1mm 1.5mm; border-radius: 4px; }
+  .mock-list div.sel { background: var(--accent); color: #fff; }
+  .field { display: grid; grid-template-columns: 31mm 1fr; align-items: center; gap: 2mm; margin-bottom: 2mm; }
+  .field span { color: #5b6274; }
+  .input { border: 1px solid #dfe4f2; border-radius: 5px; padding: 1.2mm 2mm; background: #fff; color: #8a90a3; }
+  .track { position: relative; height: 4px; background: #dfe4f2; border-radius: 4px; }
+  .track i { position: absolute; top: -4px; width: 11px; height: 11px; border-radius: 50%; background: var(--accent); }
+  .sliderow { display: flex; align-items: center; gap: 2mm; }
+  .sliderow .track { flex: 1; }
+  .val { color: #5b6274; min-width: 12mm; text-align: right; }
+  .pill { border: 1px solid #dfe4f2; border-radius: 5px; padding: .6mm 1.4mm; color: #5b6274; font-size: 7.6pt; white-space: nowrap; }
+
+  .callouts { margin-top: 3mm; font-size: 9.3pt; }
+  .callouts div { margin-bottom: 1.6mm; }
+  .dot {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 15px; height: 15px; border-radius: 50%;
+    background: var(--accent); color: #fff; font-size: 7.8pt; font-weight: 700;
+    margin-right: 5px; vertical-align: 1px;
+  }
+
+  /* ---------- Pie ---------- */
+  .foot {
+    position: absolute;
+    left: 18mm; right: 18mm; bottom: 8mm;
+    display: flex; justify-content: space-between;
+    font-size: 8pt; color: #9aa1b1;
+    border-top: 1px solid var(--line);
+    padding-top: 2.5mm;
+  }
+</style>
+</head>
+<body>
+
+<!-- ================= PÁGINA 1 ================= -->
+<section class="page cover">
+  <div class="cover-band">
+    <div class="badge">Guía de uso · versión 1.1</div>
+    <h1>PNGTuber<br>Desktop</h1>
+    <p class="sub">Tu personaje animado, apoyado en la barra de tareas, cambiando de cara con atajos de teclado.</p>
+  </div>
+
+  <div class="cover-body">
+    <h2>Qué es</h2>
+    <p class="lead">
+      Un programa nativo que pinta un GIF con transparencia real sobre el escritorio. No es un
+      navegador ni un plugin de OBS: es una ventana sin bordes que se coloca sola donde le digas, por
+      delante de tus programas y <strong>siempre por detrás de la barra de tareas</strong>.
+    </p>
+
+    <div class="grid2">
+      <div class="card soft">
+        <h3 style="margin-top:0">Lo que necesitas</h3>
+        <ul style="margin-bottom:0">
+          <li>Un <strong>GIF base</strong>: tu personaje en reposo.</li>
+          <li>Opcional: más GIFs para las <strong>variaciones</strong> (hablando, enfadado, sorpresa…).</li>
+          <li>Que los GIFs tengan <strong>fondo transparente</strong>, o se verá el recuadro.</li>
+        </ul>
+      </div>
+      <div class="card soft">
+        <h3 style="margin-top:0">Instalación</h3>
+        <ul style="margin-bottom:0">
+          <li>Ejecuta <strong>PngtuberDesktop-Setup.exe</strong>. No pide permisos de administrador.</li>
+          <li>O descomprime la versión portable y abre <strong>pngtuber.exe</strong>.</li>
+          <li>El instalador ofrece arrancar solo con Windows.</li>
+        </ul>
+      </div>
+    </div>
+
+    <h2 style="margin-top:6mm">Dónde vive el programa</h2>
+    <p>
+      Al abrirlo aparece la ventana de ajustes y, a la vez, el <strong>icono del programa</strong>
+      en la bandeja del sistema (junto al reloj). Cerrar la ventana con la <span class="ui">✕</span>
+      <strong>no cierra el programa</strong>: se queda funcionando en la bandeja.
+    </p>
+    <table>
+      <tr>
+        <td style="width:52mm"><strong>Un clic en el icono</strong></td>
+        <td>Vuelve a abrir la ventana de ajustes.</td>
+      </tr>
+      <tr>
+        <td><strong>Clic derecho en el icono</strong></td>
+        <td>Menú con <span class="ui">Configuración…</span>, <span class="ui">Mostrar / ocultar PNGTuber</span> y <span class="ui">Salir</span>.</td>
+      </tr>
+      <tr>
+        <td><strong>Doble clic sobre el GIF</strong></td>
+        <td>Abre los ajustes (sólo si el paso de clics está desactivado, ver página 4).</td>
+      </tr>
+      <tr>
+        <td><strong>Salir</strong></td>
+        <td>La única forma de cerrarlo del todo. Guarda antes la configuración.</td>
+      </tr>
+    </table>
+
+    <div class="note">
+      <b>Los ajustes, siempre por encima</b>
+      Mientras la ventana de configuración está abierta, el personaje se coloca por debajo de ella
+      y no te tapa ningún control.
+    </div>
+  </div>
+
+  <div class="foot"><span>PNGTuber Desktop · Guía de uso</span><span>1</span></div>
+</section>
+
+<!-- ================= PÁGINA 2 ================= -->
+<section class="page">
+  <h2><span class="num">1</span>Configurar tu personaje</h2>
+  <p class="lead">
+    Todo esto está en la pestaña <span class="ui">Perfiles</span>. Los cambios se aplican al
+    instante sobre el personaje: no hay botón de guardar ni hay que reiniciar nada.
+  </p>
+
+  <div class="mock">
+    <div class="mock-bar">PNGTuber de escritorio</div>
+    <div class="mock-tabs">
+      <div class="mock-tab on">Perfiles</div>
+      <div class="mock-tab">Monitores</div>
+      <div class="mock-tab">General</div>
+    </div>
+    <div class="mock-body">
+      <div>
+        <div style="color:#5b6274;margin-bottom:1.5mm">Perfiles</div>
+        <div class="mock-list">
+          <div class="sel">Principal</div>
+          <div>Stream de noche</div>
+          <div>Charla</div>
+        </div>
+        <div style="display:flex;gap:.8mm;margin-top:2mm">
+          <span class="pill">Añadir</span><span class="pill">Renombrar</span><span class="pill">Eliminar</span>
+        </div>
+      </div>
+      <div>
+        <div style="color:#5b6274;font-weight:650;margin-bottom:2mm">Aspecto y posición</div>
+        <div class="field"><span>GIF base:</span><span class="input">C:\Users\…\personaje.gif</span></div>
+        <div class="field"><span>Escala:</span>
+          <div class="sliderow"><div class="track"><i style="left:24%"></i></div><span class="val">100 %</span></div>
+        </div>
+        <div class="field"><span>Opacidad:</span>
+          <div class="sliderow"><div class="track"><i style="left:96%"></i></div></div>
+        </div>
+        <div class="field"><span>Posición:</span><span class="input">Al final de la barra</span></div>
+        <div class="field"><span>Respecto a la barra:</span><span class="input">Apoyado encima de la barra</span></div>
+        <div class="field"><span>Ajuste fino:</span>
+          <div>
+            <div class="sliderow" style="margin-bottom:1.5mm">X <div class="track"><i style="left:50%"></i></div><span class="val">0 px</span><span class="pill">0</span></div>
+            <div class="sliderow">Y <div class="track"><i style="left:41%"></i></div><span class="val">−52 px</span><span class="pill">0</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h3>Paso a paso</h3>
+  <ol>
+    <li><strong>Elige el GIF base.</strong> Pulsa <span class="ui">Examinar…</span> y busca tu archivo.
+      El personaje aparece en pantalla en cuanto lo seleccionas.</li>
+    <li><strong>Ajusta el tamaño con la barra de escala.</strong> Empieza en <strong>100 %</strong>,
+      que es el tamaño original del GIF. Puedes bajar hasta el 10 % o subir hasta el 400 %.
+      La casilla de la derecha muestra el número exacto.</li>
+    <li><strong>Coloca al personaje.</strong> <span class="ui">Posición</span> decide en qué punto
+      de la barra se apoya: al principio (izquierda), en el centro o al final (derecha).</li>
+    <li><strong>Decide la relación con la barra de tareas.</strong>
+      <span class="ui">Apoyado encima de la barra</span> lo deja de pie sobre ella;
+      <span class="ui">Ignorar la barra, pegado al borde</span> lo baja hasta el borde de la pantalla,
+      quedando medio oculto tras la barra.</li>
+    <li><strong>Afina con las barras de X e Y.</strong> Mueven el personaje píxel a píxel desde ese
+      punto de anclaje. Con la barra seleccionada, las <span class="key">←</span>
+      <span class="key">→</span> del teclado mueven de uno en uno; el botón
+      <span class="key">0</span> vuelve al anclaje original.</li>
+    <li><strong>Opacidad</strong> lo hace translúcido, por si prefieres que no tape del todo lo que hay debajo.</li>
+  </ol>
+
+  <div class="note">
+    <b>Varios personajes, varios perfiles.</b>
+    Cada perfil guarda su propio GIF, su tamaño, su posición y sus variaciones. Crea uno con
+    <span class="ui">Añadir</span> y cambia entre ellos desde la pestaña
+    <span class="ui">Monitores</span>. Es la forma de tener un personaje distinto en cada pantalla.
+  </div>
+
+  <div class="foot"><span>PNGTuber Desktop · Guía de uso</span><span>2</span></div>
+</section>
+
+<!-- ================= PÁGINA 3 ================= -->
+<section class="page">
+  <h2><span class="num">2</span>Variaciones y atajos de teclado</h2>
+  <p class="lead">
+    Una variación es otro GIF del mismo personaje que aparece al pulsar una combinación de teclas,
+    funcione lo que funcione en primer plano: el juego, el navegador, OBS…
+  </p>
+
+  <p>
+    En el recuadro <span class="ui">Variaciones y atajos</span>, pulsa
+    <span class="ui">Añadir variación</span> y rellena:
+  </p>
+  <table>
+    <tr><th style="width:34mm">Campo</th><th>Qué poner</th></tr>
+    <tr><td><strong>Nombre</strong></td><td>Para reconocerla en la lista: «Hablando», «Enfadado», «Sorpresa»…</td></tr>
+    <tr><td><strong>GIF</strong></td><td>El archivo que se muestra mientras la variación esté activa.</td></tr>
+    <tr><td><strong>Atajo global</strong></td><td>Pincha en la casilla y <strong>pulsa la combinación</strong>: se graba sola. <span class="ui">Borrar</span> la deja vacía.</td></tr>
+    <tr><td><strong>Comportamiento</strong></td><td>Conmutar o Mantener, explicados aquí debajo.</td></tr>
+  </table>
+
+  <div class="grid2" style="margin-top:5mm">
+    <div class="card">
+      <h3 style="margin-top:0">Conmutar</h3>
+      <p style="margin-bottom:0">
+        Pulsas una vez y el personaje <strong>se queda</strong> con esa cara. Vuelves a pulsar y
+        regresa al GIF base. Ideal para estados largos: «modo concentrado», «AFK».
+      </p>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0">Mantener</h3>
+      <p style="margin-bottom:0">
+        La cara se muestra <strong>sólo mientras tienes la tecla pulsada</strong>. Al soltarla vuelve
+        al GIF base. Ideal para reacciones cortas mientras hablas.
+      </p>
+    </div>
+  </div>
+
+  <p style="margin-top:4mm">
+    Para cambiar una variación, haz <strong>doble clic sobre su fila</strong> (o selecciónala y pulsa
+    <span class="ui">Editar</span>). <span class="ui">Eliminar</span> borra la seleccionada.
+  </p>
+
+  <div class="note warn">
+    <b>Si un atajo aparece en naranja abajo del todo…</b>
+    significa que Windows lo ha rechazado porque otro programa ya lo tiene cogido. Elige otra
+    combinación. Las que llevan <span class="key">Ctrl</span> + <span class="key">Alt</span> +
+    una tecla suelen estar libres.
+  </div>
+
+  <h2 style="margin-top:9mm"><span class="num">3</span>Varias pantallas</h2>
+  <p class="lead">
+    La pestaña <span class="ui">Monitores</span> lista todas tus pantallas con su resolución.
+  </p>
+  <ul>
+    <li>La casilla <strong>Activo</strong> decide si esa pantalla muestra personaje o no.</li>
+    <li>La columna <strong>Perfil</strong> es un desplegable con <strong>todos</strong> los perfiles
+      que hayas creado. Los perfiles nuevos aparecen aquí en cuanto los creas, sin cerrar nada.</li>
+    <li>Mismo perfil en todas las pantallas = el mismo personaje repetido.
+      Perfiles distintos = un personaje diferente en cada una, con sus propios GIFs y atajos.</li>
+  </ul>
+  <p>
+    Si conectas o desconectas un monitor con el programa abierto, la lista se actualiza sola.
+  </p>
+
+  <div class="foot"><span>PNGTuber Desktop · Guía de uso</span><span>3</span></div>
+</section>
+
+<!-- ================= PÁGINA 4 ================= -->
+<section class="page">
+  <h2><span class="num">4</span>Atajos y trucos</h2>
+
+  <p class="lead">
+    Estos dos atajos son globales y se cambian en la pestaña <span class="ui">General</span>.
+  </p>
+  <table>
+    <tr><th style="width:38mm">Atajo</th><th>Qué hace</th></tr>
+    <tr>
+      <td><span class="key">Ctrl</span> <span class="key">Alt</span> <span class="key">C</span></td>
+      <td><strong>Alterna el paso de clics.</strong> Por defecto el personaje deja pasar el ratón: puedes hacer clic «a través» de él. Al desactivarlo, el GIF captura el ratón y <strong>puedes arrastrarlo a donde quieras</strong>; la posición se guarda sola.</td>
+    </tr>
+    <tr>
+      <td><span class="key">Ctrl</span> <span class="key">Alt</span> <span class="key">H</span></td>
+      <td><strong>Muestra u oculta</strong> el personaje sin cerrar el programa.</td>
+    </tr>
+  </table>
+
+  <div class="note">
+    <b>Colocarlo a mano en dos pasos.</b>
+    Pulsa <span class="key">Ctrl</span><span class="key">Alt</span><span class="key">C</span>,
+    arrastra el personaje con el ratón hasta donde te guste, y vuelve a pulsarlo para que deje de
+    estorbar. Verás que las barras de ajuste fino se han movido solas al sitio nuevo.
+  </div>
+
+  <p>
+    En <span class="ui">General</span> también puedes marcar <span class="ui">Arrancar con la ventana
+    oculta en la bandeja</span>, útil si lo has puesto a arrancar con Windows. Al final de esa pestaña
+    aparece la ruta del archivo <strong>config.json</strong> donde se guarda todo, por si quieres
+    llevártelo a otro ordenador.
+  </p>
+
+  <h2 style="margin-top:7mm">Si algo no va</h2>
+  <table>
+    <tr><th style="width:62mm">Síntoma</th><th>Solución</th></tr>
+    <tr>
+      <td>El personaje tapa la barra de tareas</td>
+      <td>No debería: se recoloca solo cada pocas décimas de segundo. Comprueba que usas la versión 1.1 o superior.</td>
+    </tr>
+    <tr>
+      <td>No veo el GIF por ninguna parte</td>
+      <td>Puede estar oculto (<span class="key">Ctrl</span><span class="key">Alt</span><span class="key">H</span>), con la opacidad muy baja, o con un ajuste fino que lo ha sacado de la pantalla: pulsa los botones <span class="key">0</span> de X e Y.</td>
+    </tr>
+    <tr>
+      <td>Se ve un recuadro alrededor del personaje</td>
+      <td>El GIF no tiene fondo transparente. Hay que exportarlo de nuevo con canal alfa.</td>
+    </tr>
+    <tr>
+      <td>Un atajo no responde</td>
+      <td>Otro programa lo tiene registrado. El aviso naranja de abajo dice cuáles han fallado; cámbialos.</td>
+    </tr>
+    <tr>
+      <td>El GIF no se mueve</td>
+      <td>Es una imagen fija, no un GIF animado. También valen <strong>.webp</strong> y <strong>.apng</strong> animados.</td>
+    </tr>
+  </table>
+
+  <div class="card soft" style="margin-top:5mm">
+    <h3 style="margin-top:0">Para capturarlo en OBS</h3>
+    <p style="margin-bottom:0">
+      Como el personaje vive en el escritorio, lo más sencillo es una fuente de
+      <strong>Captura de pantalla</strong> con la zona recortada. Deja el paso de clics activado para
+      poder seguir usando el ordenador con normalidad.
+    </p>
+  </div>
+
+  <div class="foot"><span>PNGTuber Desktop · Guía de uso</span><span>4</span></div>
+</section>
+
+</body>
+</html>

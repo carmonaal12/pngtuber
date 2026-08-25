@@ -31,6 +31,11 @@ namespace {
 
 const char *kGifFilter = "Imágenes animadas (*.gif *.webp *.apng *.png);;Todos los archivos (*)";
 
+// Recorrido por defecto de las barras de ajuste fino, en píxeles a cada lado.
+// Si un perfil guardado tiene un desplazamiento mayor (porque el overlay se
+// arrastró con el ratón), el rango crece para no recortarlo.
+constexpr int kOffsetBaseRange = 600;
+
 // Recorta una QKeySequence a una sola combinación de teclas.
 QString firstCombination(const QKeySequence &seq)
 {
@@ -164,10 +169,14 @@ QWidget *ConfigWindow::buildProfilesTab()
     auto *addProfile = new QPushButton(tr("Añadir"), page);
     connect(addProfile, &QPushButton::clicked, this, [this]() {
         Profile p;
-        p.name = tr("Perfil %1").arg(m_config->profiles.size() + 1);
+        p.name = uniqueProfileName(tr("Perfil %1").arg(m_config->profiles.size() + 1));
         m_config->profiles.append(p);
         refreshProfileList();
         m_profileList->setCurrentRow(m_config->profiles.size() - 1);
+        loadProfileIntoForm();
+        // Importante: la pestaña de monitores tiene que enterarse del perfil
+        // nuevo, si no sus desplegables se quedan con la lista antigua.
+        refreshMonitorTable();
         applyAndSave();
     });
 
@@ -182,7 +191,7 @@ QWidget *ConfigWindow::buildProfilesTab()
         if (!ok || name.trimmed().isEmpty())
             return;
         const QString old = p->name;
-        p->name = name.trimmed();
+        p->name = uniqueProfileName(name, m_profileList->currentRow());
         for (MonitorAssignment &m : m_config->monitors)
             if (m.profileName == old)
                 m.profileName = p->name;
@@ -236,10 +245,14 @@ QWidget *ConfigWindow::buildProfilesTab()
     idleRow->addWidget(browseIdle);
 
     m_scaleSlider = new QSlider(Qt::Horizontal, page);
-    m_scaleSlider->setRange(10, 400);
+    m_scaleSlider->setRange(kScaleMin, kScaleMax);
+    m_scaleSlider->setSingleStep(1);
+    m_scaleSlider->setPageStep(10);
+    m_scaleSlider->setValue(kScaleDefault); // arranca siempre en 100 %
     m_scaleSpin = new QSpinBox(page);
-    m_scaleSpin->setRange(10, 400);
+    m_scaleSpin->setRange(kScaleMin, kScaleMax);
     m_scaleSpin->setSuffix(" %");
+    m_scaleSpin->setValue(kScaleDefault);
     connect(m_scaleSlider, &QSlider::valueChanged, m_scaleSpin, &QSpinBox::setValue);
     connect(m_scaleSpin, &QSpinBox::valueChanged, m_scaleSlider, &QSlider::setValue);
     connect(m_scaleSpin, &QSpinBox::valueChanged, this, [this](int v) {
@@ -272,7 +285,6 @@ QWidget *ConfigWindow::buildProfilesTab()
 
     m_barModeCombo = new QComboBox(page);
     m_barModeCombo->addItem(tr("Apoyado encima de la barra"), int(BarMode::Above));
-    m_barModeCombo->addItem(tr("Centrado dentro de la barra"), int(BarMode::On));
     m_barModeCombo->addItem(tr("Ignorar la barra, pegado al borde"), int(BarMode::Screen));
 
     auto onPlacementChanged = [this]() {
@@ -287,30 +299,45 @@ QWidget *ConfigWindow::buildProfilesTab()
     connect(m_alignCombo, &QComboBox::currentIndexChanged, this, onPlacementChanged);
     connect(m_barModeCombo, &QComboBox::currentIndexChanged, this, onPlacementChanged);
 
-    m_offsetXSpin = new QSpinBox(page);
-    m_offsetXSpin->setRange(-8000, 8000);
-    m_offsetXSpin->setSuffix(" px");
-    m_offsetYSpin = new QSpinBox(page);
-    m_offsetYSpin->setRange(-8000, 8000);
-    m_offsetYSpin->setSuffix(" px");
-    auto onOffsetChanged = [this]() {
-        if (m_loading)
-            return;
-        if (Profile *p = currentProfile()) {
-            p->offsetX = m_offsetXSpin->value();
-            p->offsetY = m_offsetYSpin->value();
-            applyAndSave();
-        }
+    // --- Ajuste fino: dos barras deslizantes, sin escribir coordenadas ---
+    auto buildOffsetRow = [this, page](const QString &axis, QSlider *&slider,
+                                       QLabel *&valueLabel) {
+        slider = new QSlider(Qt::Horizontal, page);
+        slider->setRange(-kOffsetBaseRange, kOffsetBaseRange);
+        slider->setSingleStep(1);   // flechas del teclado: 1 píxel exacto
+        slider->setPageStep(10);
+        slider->setValue(0);
+        slider->setMinimumWidth(220);
+
+        valueLabel = new QLabel(tr("0 px"), page);
+        valueLabel->setMinimumWidth(64);
+        valueLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+
+        auto *reset = new QPushButton(tr("0"), page);
+        reset->setToolTip(tr("Volver al centro (0 px)"));
+        reset->setFixedWidth(32);
+        connect(reset, &QPushButton::clicked, slider, [slider]() { slider->setValue(0); });
+
+        connect(slider, &QSlider::valueChanged, valueLabel, [valueLabel](int v) {
+            valueLabel->setText(tr("%1 px").arg(v));
+        });
+        connect(slider, &QSlider::valueChanged, this, [this]() { pushOffsetsToProfile(); });
+
+        auto *row = new QHBoxLayout;
+        row->addWidget(new QLabel(axis, page));
+        row->addWidget(slider, 1);
+        row->addWidget(valueLabel);
+        row->addWidget(reset);
+        return row;
     };
-    connect(m_offsetXSpin, &QSpinBox::valueChanged, this, onOffsetChanged);
-    connect(m_offsetYSpin, &QSpinBox::valueChanged, this, onOffsetChanged);
-    auto *offsetRow = new QHBoxLayout;
-    offsetRow->addWidget(new QLabel(tr("X:"), page));
-    offsetRow->addWidget(m_offsetXSpin);
-    offsetRow->addSpacing(12);
-    offsetRow->addWidget(new QLabel(tr("Y:"), page));
-    offsetRow->addWidget(m_offsetYSpin);
-    offsetRow->addStretch(1);
+
+    auto *offsetXRow = buildOffsetRow(tr("X:"), m_offsetXSlider, m_offsetXValue);
+    auto *offsetYRow = buildOffsetRow(tr("Y:"), m_offsetYSlider, m_offsetYValue);
+
+    auto *offsetBox = new QVBoxLayout;
+    offsetBox->setContentsMargins(0, 0, 0, 0);
+    offsetBox->addLayout(offsetXRow);
+    offsetBox->addLayout(offsetYRow);
 
     m_clickThroughCheck = new QCheckBox(tr("Dejar pasar los clics del ratón"), page);
     connect(m_clickThroughCheck, &QCheckBox::toggled, this, [this](bool on) {
@@ -329,7 +356,7 @@ QWidget *ConfigWindow::buildProfilesTab()
     appearanceForm->addRow(tr("Opacidad:"), m_opacitySlider);
     appearanceForm->addRow(tr("Posición:"), m_alignCombo);
     appearanceForm->addRow(tr("Respecto a la barra:"), m_barModeCombo);
-    appearanceForm->addRow(tr("Ajuste fino:"), offsetRow);
+    appearanceForm->addRow(tr("Ajuste fino:"), offsetBox);
     appearanceForm->addRow(QString(), m_clickThroughCheck);
 
     // --- Variaciones ---
@@ -401,13 +428,16 @@ QWidget *ConfigWindow::buildMonitorsTab()
     m_monitorTable = new QTableWidget(0, 3, page);
     m_monitorTable->setHorizontalHeaderLabels({ tr("Monitor"), tr("Activo"), tr("Perfil") });
     m_monitorTable->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
+    m_monitorTable->horizontalHeader()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
+    m_monitorTable->horizontalHeader()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
     m_monitorTable->verticalHeader()->hide();
     m_monitorTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
 
     auto *hint = new QLabel(
         tr("Activa el overlay en los monitores que quieras. Si eliges el mismo perfil "
            "en todos, verás el mismo PNGTuber repetido; si eliges perfiles distintos, "
-           "cada pantalla tendrá el suyo con sus propios GIFs."),
+           "cada pantalla tendrá el suyo con sus propios GIFs. Los perfiles que crees "
+           "en la pestaña «Perfiles» aparecen aquí al momento."),
         page);
     hint->setWordWrap(true);
 
@@ -502,17 +532,68 @@ void ConfigWindow::loadProfileIntoForm()
 
     m_loading = true;
     m_idleGifEdit->setText(p->idleGif);
-    m_scaleSpin->setValue(p->scalePercent);
-    m_scaleSlider->setValue(p->scalePercent);
-    m_opacitySlider->setValue(p->opacityPercent);
-    m_alignCombo->setCurrentIndex(m_alignCombo->findData(int(p->align)));
-    m_barModeCombo->setCurrentIndex(m_barModeCombo->findData(int(p->barMode)));
-    m_offsetXSpin->setValue(p->offsetX);
-    m_offsetYSpin->setValue(p->offsetY);
+
+    const int scale = qBound(kScaleMin, p->scalePercent, kScaleMax);
+    p->scalePercent = scale;
+    m_scaleSlider->setValue(scale);
+    m_scaleSpin->setValue(scale);
+
+    m_opacitySlider->setValue(qBound(5, p->opacityPercent, 100));
+    m_alignCombo->setCurrentIndex(qMax(0, m_alignCombo->findData(int(p->align))));
+    m_barModeCombo->setCurrentIndex(qMax(0, m_barModeCombo->findData(int(p->barMode))));
+
+    applyOffsetToSlider(m_offsetXSlider, m_offsetXValue, p->offsetX);
+    applyOffsetToSlider(m_offsetYSlider, m_offsetYValue, p->offsetY);
+
     m_clickThroughCheck->setChecked(p->clickThrough);
     m_loading = false;
 
     refreshVariationTable();
+}
+
+// Coloca un desplazamiento en su barra, ampliando el recorrido si el valor
+// guardado se sale del rango habitual.
+void ConfigWindow::applyOffsetToSlider(QSlider *slider, QLabel *valueLabel, int value)
+{
+    const int span = qMax(kOffsetBaseRange, qAbs(value) + 100);
+    if (span != slider->maximum())
+        slider->setRange(-span, span);
+    slider->setValue(value);
+    valueLabel->setText(tr("%1 px").arg(value));
+}
+
+void ConfigWindow::pushOffsetsToProfile()
+{
+    if (m_loading)
+        return;
+    if (Profile *p = currentProfile()) {
+        p->offsetX = m_offsetXSlider->value();
+        p->offsetY = m_offsetYSlider->value();
+        applyAndSave();
+    }
+}
+
+// Evita perfiles con el mismo nombre: la asignación por monitor los distingue
+// justamente por el nombre.
+QString ConfigWindow::uniqueProfileName(const QString &wanted, int ignoreIndex) const
+{
+    const QString base = wanted.trimmed().isEmpty() ? tr("Perfil") : wanted.trimmed();
+    QString candidate = base;
+    int suffix = 2;
+    bool clash = true;
+    while (clash) {
+        clash = false;
+        for (int i = 0; i < m_config->profiles.size(); ++i) {
+            if (i == ignoreIndex)
+                continue;
+            if (m_config->profiles.at(i).name.compare(candidate, Qt::CaseInsensitive) == 0) {
+                clash = true;
+                candidate = QStringLiteral("%1 %2").arg(base).arg(suffix++);
+                break;
+            }
+        }
+    }
+    return candidate;
 }
 
 void ConfigWindow::refreshVariationTable()
@@ -535,30 +616,42 @@ void ConfigWindow::refreshVariationTable()
 
 void ConfigWindow::refreshMonitorTable()
 {
+    const bool wasLoading = m_loading;
+    m_loading = true;
+
     const QList<QScreen *> screens = QGuiApplication::screens();
+
+    // Se vacía la tabla para destruir los desplegables antiguos: si no, se
+    // quedarían con la lista de perfiles de la última vez.
+    m_monitorTable->setRowCount(0);
     m_monitorTable->setRowCount(screens.size());
 
     for (int i = 0; i < screens.size(); ++i) {
         QScreen *s = screens.at(i);
         const QRect g = s->geometry();
-        auto *nameItem = new QTableWidgetItem(
-            QStringLiteral("%1  (%2×%3)").arg(s->name()).arg(g.width()).arg(g.height()));
-        m_monitorTable->setItem(i, 0, nameItem);
+        const QString screenName = s->name();
 
-        MonitorAssignment *assign = m_config->monitorByName(s->name());
+        m_monitorTable->setItem(i, 0, new QTableWidgetItem(
+            QStringLiteral("%1  (%2×%3)").arg(screenName).arg(g.width()).arg(g.height())));
+
+        MonitorAssignment *assign = m_config->monitorByName(screenName);
         if (!assign) {
             MonitorAssignment m;
-            m.screenName = s->name();
+            m.screenName = screenName;
             m.enabled = (i == 0);
             m.profileName = m_config->profiles.isEmpty() ? QString()
                                                          : m_config->profiles.first().name;
             m_config->monitors.append(m);
-            assign = m_config->monitorByName(s->name());
+            assign = m_config->monitorByName(screenName);
         }
+
+        // Si el perfil asignado ya no existe (renombrado o borrado), se cae al
+        // primero disponible en vez de dejar el monitor sin overlay.
+        if (!m_config->profileByName(assign->profileName) && !m_config->profiles.isEmpty())
+            assign->profileName = m_config->profiles.first().name;
 
         auto *check = new QCheckBox(m_monitorTable);
         check->setChecked(assign->enabled);
-        const QString screenName = s->name();
         connect(check, &QCheckBox::toggled, this, [this, screenName](bool on) {
             if (m_loading)
                 return;
@@ -569,13 +662,15 @@ void ConfigWindow::refreshMonitorTable()
         });
         m_monitorTable->setCellWidget(i, 1, check);
 
+        // El desplegable se rellena con TODOS los perfiles y sólo después se
+        // conecta la señal, para que rellenarlo no reescriba la asignación.
         auto *combo = new QComboBox(m_monitorTable);
         for (const Profile &p : m_config->profiles)
             combo->addItem(p.name);
-        combo->setCurrentText(assign->profileName);
+        combo->setCurrentIndex(qMax(0, combo->findText(assign->profileName)));
         connect(combo, &QComboBox::currentTextChanged, this,
                 [this, screenName](const QString &name) {
-                    if (m_loading)
+                    if (m_loading || name.isEmpty())
                         return;
                     if (MonitorAssignment *m = m_config->monitorByName(screenName)) {
                         m->profileName = name;
@@ -584,6 +679,8 @@ void ConfigWindow::refreshMonitorTable()
                 });
         m_monitorTable->setCellWidget(i, 2, combo);
     }
+
+    m_loading = wasLoading;
 }
 
 void ConfigWindow::refreshHotkeyWarnings()
@@ -630,4 +727,20 @@ void ConfigWindow::closeEvent(QCloseEvent *event)
     emit requestSave();
     hide();
     event->ignore();
+}
+
+// Mientras la ventana de ajustes está a la vista, los overlays se colocan
+// justo por debajo de ella: así el PNGTuber nunca tapa la interfaz.
+void ConfigWindow::showEvent(QShowEvent *event)
+{
+    QWidget::showEvent(event);
+    if (m_controller)
+        m_controller->setStackReference(winId());
+}
+
+void ConfigWindow::hideEvent(QHideEvent *event)
+{
+    QWidget::hideEvent(event);
+    if (m_controller)
+        m_controller->setStackReference(0);
 }

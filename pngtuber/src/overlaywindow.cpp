@@ -7,18 +7,109 @@
 #include <QScreen>
 #include <QWindow>
 
+#ifdef Q_OS_WIN
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#include <cwchar>
+
+namespace {
+
+// Datos que recoge la búsqueda de la barra de tareas del monitor indicado.
+struct TaskbarSearch {
+    HMONITOR monitor = nullptr;
+    HWND match = nullptr;   // barra del monitor buscado
+    HWND primary = nullptr; // barra principal, como reserva
+};
+
+BOOL CALLBACK findTaskbarProc(HWND hwnd, LPARAM param)
+{
+    auto *ctx = reinterpret_cast<TaskbarSearch *>(param);
+
+    wchar_t cls[64] = {};
+    if (GetClassNameW(hwnd, cls, 64) == 0)
+        return TRUE;
+
+    const bool isPrimaryBar = (wcscmp(cls, L"Shell_TrayWnd") == 0);
+    const bool isSecondaryBar = (wcscmp(cls, L"Shell_SecondaryTrayWnd") == 0);
+    if (!isPrimaryBar && !isSecondaryBar)
+        return TRUE;
+
+    if (isPrimaryBar && !ctx->primary)
+        ctx->primary = hwnd;
+
+    if (ctx->monitor && MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST) == ctx->monitor) {
+        ctx->match = hwnd;
+        return FALSE; // encontrada la de este monitor: se corta la búsqueda
+    }
+    return TRUE;
+}
+
+} // namespace
+#endif // Q_OS_WIN
+
 OverlayWindow::OverlayWindow(QScreen *screen, QWidget *parent)
     : QWidget(parent)
     , m_screen(screen)
 {
-    setWindowFlags(Qt::FramelessWindowHint
-                   | Qt::WindowStaysOnTopHint
-                   | Qt::Tool                    // fuera de la barra de tareas y del Alt+Tab
-                   | Qt::NoDropShadowWindowHint
-                   | Qt::WindowDoesNotAcceptFocus);
+    Qt::WindowFlags flags = Qt::FramelessWindowHint
+                            | Qt::Tool // fuera de la barra de tareas y del Alt+Tab
+                            | Qt::NoDropShadowWindowHint
+                            | Qt::WindowDoesNotAcceptFocus;
+#ifndef Q_OS_WIN
+    // En Windows el orden Z se controla a mano en applyStacking(), para poder
+    // dejar el overlay por debajo de la barra de tareas. En el resto de
+    // sistemas basta con la pista de "siempre encima".
+    flags |= Qt::WindowStaysOnTopHint;
+#endif
+    setWindowFlags(flags);
     setAttribute(Qt::WA_TranslucentBackground);
     setAttribute(Qt::WA_ShowWithoutActivating);
-    setAttribute(Qt::WA_AlwaysStackOnTop);
+}
+
+void OverlayWindow::setStackReference(WId reference)
+{
+    if (m_stackReference == reference)
+        return;
+    m_stackReference = reference;
+    applyStacking();
+}
+
+// Coloca el overlay justo por debajo de la ventana de referencia. Sin
+// referencia, justo por debajo de la barra de tareas de su monitor: así el
+// PNGTuber tapa a las demás ventanas pero nunca a la barra.
+void OverlayWindow::applyStacking()
+{
+#ifdef Q_OS_WIN
+    if (!isVisible())
+        return;
+
+    HWND self = reinterpret_cast<HWND>(winId());
+    if (!self || !IsWindow(self))
+        return;
+
+    HWND reference = reinterpret_cast<HWND>(m_stackReference);
+    if (reference && (!IsWindow(reference) || !IsWindowVisible(reference)))
+        reference = nullptr;
+
+    if (!reference) {
+        TaskbarSearch ctx;
+        ctx.monitor = MonitorFromWindow(self, MONITOR_DEFAULTTONEAREST);
+        EnumWindows(findTaskbarProc, reinterpret_cast<LPARAM>(&ctx));
+        reference = ctx.match ? ctx.match : ctx.primary;
+    }
+
+    const UINT flags = SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER;
+    if (reference)
+        SetWindowPos(self, reference, 0, 0, 0, 0, flags);
+    else
+        SetWindowPos(self, HWND_TOPMOST, 0, 0, 0, 0, flags);
+#else
+    // En X11 y macOS basta con subir la ventana dentro de su capa.
+    if (isVisible())
+        raise();
+#endif
 }
 
 void OverlayWindow::applyProfile(const Profile &profile)
@@ -131,9 +222,7 @@ QPoint OverlayWindow::anchoredPosition(const QSize &size) const
         case Align::Center: x = bar.center().x() - size.width() / 2; break;
         case Align::End:    x = bar.right() - size.width() + 1; break;
         }
-        if (m_profile.barMode == BarMode::On)
-            y = bar.center().y() - size.height() / 2;
-        else if (edge == Qt::BottomEdge)
+        if (edge == Qt::BottomEdge)
             y = bar.top() - size.height();
         else
             y = bar.bottom() + 1;
@@ -143,9 +232,7 @@ QPoint OverlayWindow::anchoredPosition(const QSize &size) const
         case Align::Center: y = bar.center().y() - size.height() / 2; break;
         case Align::End:    y = bar.bottom() - size.height() + 1; break;
         }
-        if (m_profile.barMode == BarMode::On)
-            x = bar.center().x() - size.width() / 2;
-        else if (edge == Qt::LeftEdge)
+        if (edge == Qt::LeftEdge)
             x = bar.right() + 1;
         else
             x = bar.left() - size.width();
@@ -167,7 +254,7 @@ void OverlayWindow::relayout()
     if (frame.isEmpty())
         frame = QSize(200, 200);
 
-    const double factor = qBound(10, m_profile.scalePercent, 400) / 100.0;
+    const double factor = qBound(kScaleMin, m_profile.scalePercent, kScaleMax) / 100.0;
     const QSize target(qMax(1, int(frame.width() * factor)),
                        qMax(1, int(frame.height() * factor)));
 
@@ -178,7 +265,7 @@ void OverlayWindow::relayout()
         show();
     if (windowHandle() && m_screen)
         windowHandle()->setScreen(m_screen);
-    raise();
+    applyStacking();
     update();
 }
 
@@ -199,7 +286,7 @@ void OverlayWindow::setClickThrough(bool enabled)
     if (wasVisible) {
         show();
         setGeometry(geom);
-        raise();
+        applyStacking();
     }
 }
 

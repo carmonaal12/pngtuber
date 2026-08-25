@@ -13,11 +13,17 @@ enum class TriggerMode {
 enum class Align { Start, Center, End };
 
 // Relación vertical (u horizontal, si la barra está en un lateral) con la barra.
+// El overlay se dibuja siempre por detrás de la barra de tareas, así que no
+// existe un modo "dentro de la barra": el GIF quedaría tapado.
 enum class BarMode {
     Above, // El GIF se apoya sobre la barra, por fuera.
-    On,    // El GIF se centra dentro de la franja de la barra.
     Screen // Se ignora la barra y se ancla al borde de la pantalla.
 };
+
+// Límites de los controles de escala, compartidos por la interfaz y el overlay.
+constexpr int kScaleMin = 10;
+constexpr int kScaleMax = 400;
+constexpr int kScaleDefault = 100;
 
 struct Variation {
     QString name;
@@ -31,7 +37,7 @@ struct Profile {
     QString idleGif;
     QVector<Variation> variations;
 
-    int scalePercent = 100; // 10 .. 400
+    int scalePercent = kScaleDefault; // kScaleMin .. kScaleMax
     Align align = Align::End;
     BarMode barMode = BarMode::Above;
     int offsetX = 0;

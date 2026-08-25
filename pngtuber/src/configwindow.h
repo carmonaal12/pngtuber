@@ -32,6 +32,8 @@ signals:
 
 protected:
     void closeEvent(QCloseEvent *event) override;
+    void showEvent(QShowEvent *event) override;
+    void hideEvent(QHideEvent *event) override;
 
 private:
     QWidget *buildProfilesTab();
@@ -47,6 +49,9 @@ private:
 
     void applyAndSave();
     void editVariation(int row);
+    void pushOffsetsToProfile();
+    void applyOffsetToSlider(QSlider *slider, QLabel *valueLabel, int value);
+    QString uniqueProfileName(const QString &wanted, int ignoreIndex = -1) const;
 
     AppConfig *m_config = nullptr;
     OverlayController *m_controller = nullptr;
@@ -59,8 +64,10 @@ private:
     QSlider *m_opacitySlider = nullptr;
     QComboBox *m_alignCombo = nullptr;
     QComboBox *m_barModeCombo = nullptr;
-    QSpinBox *m_offsetXSpin = nullptr;
-    QSpinBox *m_offsetYSpin = nullptr;
+    QSlider *m_offsetXSlider = nullptr;
+    QSlider *m_offsetYSlider = nullptr;
+    QLabel *m_offsetXValue = nullptr;
+    QLabel *m_offsetYValue = nullptr;
     QCheckBox *m_clickThroughCheck = nullptr;
     QTableWidget *m_variationTable = nullptr;
 
