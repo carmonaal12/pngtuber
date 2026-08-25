@@ -1,0 +1,99 @@
+name: Compilar para macOS
+
+on:
+  push:
+    branches: [main, master]
+    tags: ['v*']
+  workflow_dispatch:
+
+env:
+  QT_VERSION: 6.8.3
+
+jobs:
+  build:
+    # Runner de Apple Silicon. Las compilaciones oficiales de Qt para macOS son
+    # universales, así que desde aquí se genera un binario que funciona igual en
+    # los Mac con chip M y en los Intel.
+    runs-on: macos-14
+
+    defaults:
+      run:
+        working-directory: pngtuber
+
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - name: Preparar Python (necesario para aqtinstall)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Instalar Qt para macOS
+        run: |
+          pip install aqtinstall
+          aqt install-qt mac desktop "$QT_VERSION" clang_64 \
+              --outputdir "$GITHUB_WORKSPACE/Qt"
+          echo "QT_DIR=$GITHUB_WORKSPACE/Qt/$QT_VERSION/macos" >> "$GITHUB_ENV"
+
+      - name: Configurar y compilar
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON \
+                -DCMAKE_PREFIX_PATH="$QT_DIR" \
+                -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" \
+                -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0
+          cmake --build build --parallel
+
+      - name: Pasar las pruebas de la interfaz
+        run: |
+          if ! QT_QPA_PLATFORM=offscreen ./build/ui_test; then
+            echo "Reintentando con la plataforma nativa..."
+            ./build/ui_test
+          fi
+
+      - name: Crear el .dmg
+        run: |
+          "$QT_DIR/bin/macdeployqt" build/pngtuber.app -always-overwrite
+
+          # Firma ad-hoc. En Apple Silicon un binario sin firma ninguna no
+          # arranca; esto NO sustituye a una firma de desarrollador, así que
+          # Gatekeeper seguirá avisando la primera vez.
+          codesign --force --deep --sign - build/pngtuber.app
+          codesign --verify --deep --strict build/pngtuber.app
+          echo "Arquitecturas del binario:"
+          lipo -archs build/pngtuber.app/Contents/MacOS/pngtuber
+
+          rm -rf dmgroot && mkdir dmgroot
+          ditto build/pngtuber.app "dmgroot/PNGTuber Desktop.app"
+          ln -s /Applications dmgroot/Applications
+          if [ -f docs/Guia-de-uso.pdf ]; then
+            cp docs/Guia-de-uso.pdf dmgroot/
+          fi
+
+          hdiutil create -volname "PNGTuber Desktop" -srcfolder dmgroot \
+                 -ov -format UDZO PngtuberDesktop-macos.dmg
+          ls -lh PngtuberDesktop-macos.dmg
+
+      - name: Comprobar que la app arranca
+        run: |
+          # Sin sesión gráfica no se puede lanzar el bundle, pero sí verificar
+          # que el ejecutable enlaza bien y encuentra los frameworks de Qt.
+          otool -L build/pngtuber.app/Contents/MacOS/pngtuber | head -20
+          test -d build/pngtuber.app/Contents/Frameworks/QtWidgets.framework
+          test -f build/pngtuber.app/Contents/Resources/icon.icns
+          /usr/libexec/PlistBuddy -c "Print :LSUIElement" \
+              build/pngtuber.app/Contents/Info.plist
+          echo "El bundle está completo."
+
+      - name: Subir los resultados
+        uses: actions/upload-artifact@v4
+        with:
+          name: PngtuberDesktop-macos
+          path: pngtuber/PngtuberDesktop-macos.dmg
+          retention-days: 30
+
+      - name: Publicar Release (sólo al crear una etiqueta v*)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: pngtuber/PngtuberDesktop-macos.dmg

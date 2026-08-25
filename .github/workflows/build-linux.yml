@@ -1,0 +1,122 @@
+name: Compilar para Linux
+
+on:
+  push:
+    branches: [main, master]
+    tags: ['v*']
+  workflow_dispatch:
+
+env:
+  QT_VERSION: 6.8.3
+
+jobs:
+  build:
+    # Se compila sobre Ubuntu 22.04 a propósito: el AppImage hereda la versión
+    # de glibc de la máquina donde se construye, y con 24.04 dejaría fuera a
+    # cualquiera con una distribución de hace más de un par de años.
+    # Si GitHub retira este runner, sube a ubuntu-24.04 y asúmelo.
+    runs-on: ubuntu-22.04
+
+    defaults:
+      run:
+        working-directory: pngtuber
+
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - name: Preparar Python (necesario para aqtinstall)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Instalar dependencias del sistema
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake \
+            libx11-dev libgl1-mesa-dev libegl1-mesa-dev \
+            libfontconfig1-dev libfreetype6-dev \
+            libxkbcommon-dev libxkbcommon-x11-0 \
+            libxcb1 libxcb-cursor0 libxcb-glx0 libxcb-icccm4 libxcb-image0 \
+            libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-shape0 \
+            libxcb-shm0 libxcb-sync1 libxcb-util1 libxcb-xfixes0 \
+            libxcb-xinerama0 libxcb-xkb1 libdbus-1-3 \
+            xvfb file desktop-file-utils
+
+      - name: Instalar Qt para Linux
+        run: |
+          pip install aqtinstall
+          aqt install-qt linux desktop "$QT_VERSION" linux_gcc_64 \
+              --outputdir "$GITHUB_WORKSPACE/Qt"
+          echo "QT_DIR=$GITHUB_WORKSPACE/Qt/$QT_VERSION/gcc_64" >> "$GITHUB_ENV"
+
+      - name: Configurar y compilar
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON \
+                -DCMAKE_PREFIX_PATH="$QT_DIR" -DCMAKE_INSTALL_PREFIX=/usr
+          cmake --build build --parallel
+
+      - name: Pasar las pruebas de la interfaz
+        run: |
+          xvfb-run -a --server-args="-screen 0 1280x800x24" ./build/ui_test
+
+      - name: Crear el AppImage
+        run: |
+          DESTDIR="$PWD/AppDir" cmake --install build
+          mkdir -p AppDir/usr/share/applications \
+                   AppDir/usr/share/icons/hicolor/256x256/apps
+          cp installer/pngtuber.desktop AppDir/usr/share/applications/
+          cp resources/icon-256.png \
+             AppDir/usr/share/icons/hicolor/256x256/apps/pngtuber.png
+
+          curl -sSfL -o linuxdeploy \
+            https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          curl -sSfL -o linuxdeploy-plugin-qt \
+            https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
+          chmod +x linuxdeploy linuxdeploy-plugin-qt
+
+          # Los runners de GitHub no tienen FUSE, así que los AppImage de las
+          # herramientas se autoextraen en vez de montarse.
+          export APPIMAGE_EXTRACT_AND_RUN=1
+          export PATH="$PWD:$PATH"
+          export QMAKE="$QT_DIR/bin/qmake"
+          export NO_STRIP=true
+
+          ./linuxdeploy --appdir AppDir --plugin qt --output appimage \
+              --desktop-file installer/pngtuber.desktop \
+              --icon-file resources/icon-256.png --icon-filename pngtuber
+
+          mv PNGTuber_Desktop*.AppImage PngtuberDesktop-linux-x86_64.AppImage
+          ls -lh PngtuberDesktop-linux-x86_64.AppImage
+
+      - name: Comprobar que el AppImage arranca
+        run: |
+          export APPIMAGE_EXTRACT_AND_RUN=1
+          xvfb-run -a --server-args="-screen 0 1280x800x24" \
+            timeout 12 ./PngtuberDesktop-linux-x86_64.AppImage &
+          PID=$!
+          sleep 8
+          if ! ps -p $PID > /dev/null; then
+            echo "El AppImage se cerró solo: falta alguna biblioteca."
+            exit 1
+          fi
+          kill $PID 2>/dev/null || true
+          echo "El AppImage arranca correctamente."
+
+      - name: Subir los resultados
+        uses: actions/upload-artifact@v4
+        with:
+          name: PngtuberDesktop-linux
+          path: |
+            pngtuber/PngtuberDesktop-linux-x86_64.AppImage
+            pngtuber/docs/Guia-de-uso.pdf
+          retention-days: 30
+
+      - name: Publicar Release (sólo al crear una etiqueta v*)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            pngtuber/PngtuberDesktop-linux-x86_64.AppImage
+            pngtuber/docs/Guia-de-uso.pdf

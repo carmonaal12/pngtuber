@@ -66,6 +66,11 @@ OverlayWindow::OverlayWindow(QScreen *screen, QWidget *parent)
     setWindowFlags(flags);
     setAttribute(Qt::WA_TranslucentBackground);
     setAttribute(Qt::WA_ShowWithoutActivating);
+    // En macOS las ventanas Qt::Tool se ocultan solas cuando la aplicación deja
+    // de estar activa: sin esto el personaje desaparecería al cambiar de
+    // programa, que es justo cuando tiene que verse. No afecta al resto de
+    // sistemas.
+    setAttribute(Qt::WA_MacAlwaysShowToolWindow);
 }
 
 void OverlayWindow::setStackReference(WId reference)

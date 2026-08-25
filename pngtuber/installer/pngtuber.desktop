@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=PNGTuber Desktop
+GenericName=Overlay de PNGTuber
+Comment=Tu personaje animado apoyado en la barra de tareas
+Exec=pngtuber
+Icon=pngtuber
+Categories=Utility;AudioVideo;
+Terminal=false
+StartupNotify=false
+Keywords=pngtuber;overlay;stream;avatar;

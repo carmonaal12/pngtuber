@@ -49,6 +49,22 @@ set_target_properties(pngtuber PROPERTIES
     MACOSX_BUNDLE_GUI_IDENTIFIER "com.pngtuber.desktop"
 )
 
+if(APPLE)
+    # El .icns va dentro del bundle y el Info.plist marca la app como
+    # LSUIElement: sin icono en el Dock, igual que en Windows no sale en la
+    # barra de tareas.
+    set(PNGTUBER_ICNS "${CMAKE_CURRENT_SOURCE_DIR}/resources/icon.icns")
+    target_sources(pngtuber PRIVATE "${PNGTUBER_ICNS}")
+    set_source_files_properties("${PNGTUBER_ICNS}" PROPERTIES
+        MACOSX_PACKAGE_LOCATION Resources)
+    set_target_properties(pngtuber PROPERTIES
+        MACOSX_BUNDLE_ICON_FILE "icon.icns"
+        MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
+        MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
+        MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/installer/Info.plist.in"
+    )
+endif()
+
 # --- Dependencias nativas de cada plataforma para los atajos globales ---
 if(WIN32)
     target_link_libraries(pngtuber PRIVATE user32)

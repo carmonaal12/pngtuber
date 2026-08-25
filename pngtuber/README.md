@@ -29,28 +29,59 @@ Consumo típico: ~35-60 MB de RAM y prácticamente 0 % de CPU en reposo.
   clics desactivados puedes arrastrar el GIF con el ratón y la posición se guarda.
 - Todo se guarda en JSON y se aplica en caliente, sin reiniciar.
 
-## Conseguir el .exe de Windows sin instalar nada
+## Descargar el programa ya compilado
 
-El repositorio incluye un flujo de GitHub Actions que compila el programa en una
-máquina Windows real y genera dos cosas: un instalador (`PngtuberDesktop-Setup.exe`)
-y una carpeta portable comprimida.
+El repositorio incluye tres flujos de GitHub Actions que compilan el programa en
+máquinas reales de cada sistema y dejan un paquete listo para usar:
 
-1. Crea un repositorio en GitHub y sube este proyecto entero, incluida la carpeta
-   oculta `.github`.
-2. Entra en la pestaña **Actions**, elige *Compilar para Windows* y pulsa
-   **Run workflow**. Tarda unos 5-8 minutos.
-3. Cuando termine, abre la ejecución y descarga el artefacto
-   **PngtuberDesktop-windows** de la sección *Artifacts*.
+| Sistema | Qué genera | Archivo |
+|---|---|---|
+| Windows | Instalador y carpeta portable | `PngtuberDesktop-Setup.exe`, `PngtuberDesktop-portable-win64.zip` |
+| Linux | AppImage autocontenido (x86-64) | `PngtuberDesktop-linux-x86_64.AppImage` |
+| macOS | Imagen de disco universal (Intel + Apple Silicon) | `PngtuberDesktop-macos.dmg` |
 
-El instalador no pide permisos de administrador: instala en la carpeta del usuario,
-crea el acceso directo en el menú Inicio y ofrece la casilla de arranque automático
-con Windows. La versión portable es una carpeta que se descomprime y se ejecuta.
+1. Sube el proyecto entero a GitHub, incluida la carpeta oculta `.github`.
+2. Entra en **Actions**, elige el flujo que quieras y pulsa **Run workflow**.
+   Cada uno tarda entre 5 y 10 minutos.
+3. Descarga el artefacto de la sección *Artifacts* de esa ejecución.
 
-Si etiquetas una versión (`git tag v1.0 && git push --tags`), el flujo publica
-además una Release con los dos archivos listos para descargar o compartir.
+Si etiquetas una versión (`git tag v1.1.0 && git push --tags`), los tres flujos
+publican sus paquetes en una misma Release, ya lista para compartir.
 
-La versión de Qt está fijada al principio de
-`.github/workflows/build-windows.yml`; cámbiala ahí si quieres otra.
+La versión de Qt está fijada al principio de cada archivo de
+`.github/workflows/`; cámbiala ahí si quieres otra.
+
+### Instalar en cada sistema
+
+**Windows.** Ejecuta el instalador. No pide permisos de administrador: instala
+en la carpeta del usuario, crea el acceso directo en el menú Inicio junto a la
+guía en PDF, y ofrece la casilla de arranque automático con Windows. La versión
+portable es una carpeta que se descomprime y se ejecuta.
+
+**Linux.** Dale permisos de ejecución y ábrelo, no hay nada que instalar:
+
+```bash
+chmod +x PngtuberDesktop-linux-x86_64.AppImage
+./PngtuberDesktop-linux-x86_64.AppImage
+```
+
+Necesita una sesión **Xorg**; en Wayland ni los atajos globales ni el
+posicionamiento absoluto funcionan (ver *Limitaciones conocidas*).
+
+**macOS.** Abre el `.dmg` y arrastra la app a Aplicaciones. El paquete lleva sólo
+una firma ad-hoc, no una de desarrollador de pago, así que la primera vez
+Gatekeeper avisará de que "no se puede comprobar el desarrollador". Para
+saltarlo: **clic derecho sobre la app → Abrir → Abrir**. Si el aviso dice que la
+app "está dañada", quítale la marca de cuarentena:
+
+```bash
+xattr -cr "/Applications/PNGTuber Desktop.app"
+```
+
+Después hay que conceder permisos en **Ajustes → Privacidad y seguridad →
+Accesibilidad** y en **Monitorización de entrada** para que funcionen los atajos
+globales. La app no aparece en el Dock: vive en la barra de menús, arriba a la
+derecha.
 
 ## Compilación manual
 
@@ -86,7 +117,7 @@ cmake --build build -j
 macdeployqt build/pngtuber.app
 ```
 
-### Prueba funcional
+### Pruebas funcionales
 
 ```bash
 cmake -B build -DBUILD_TESTS=ON && cmake --build build -j
@@ -129,10 +160,14 @@ decida el compositor y los atajos no se registrarán. Si tu distribución arranc
 en Wayland por defecto, elige "Xorg" en la pantalla de inicio de sesión. Dar
 soporte a Wayland exigiría `wlr-layer-shell` (sólo compositores wlroots: Sway,
 Hyprland) para la posición y el portal `GlobalShortcuts` para los atajos.
+Además, el overlay queda por encima de las demás ventanas pero no por detrás del
+panel del escritorio: ese ajuste fino del orden Z sólo está hecho para Windows.
 
 **macOS — permisos y ausencia de barra de tareas.** macOS no tiene barra de
 tareas: la detección se hace contra el Dock y la barra de menús vía
-`availableGeometry`, así que "la barra" es el Dock. Además, la primera vez habrá
+`availableGeometry`, así que "la barra" es el Dock. El truco de dejar el overlay
+por detrás de la barra es específico de Windows; aquí el personaje se queda
+simplemente por encima del resto de ventanas. Además, la primera vez habrá
 que conceder permisos en Ajustes → Privacidad y seguridad → Accesibilidad y
 Monitorización de entrada para que funcionen los atajos globales. Ten en cuenta
 que Qt intercambia Ctrl y Cmd en macOS: lo que grabes como `Ctrl+Alt+1` se
@@ -159,7 +194,8 @@ indicando qué atajos han fallado.
 | `keystate.h/.cpp` | Sondeo del estado físico de una tecla, para el modo "mantener" |
 | `configwindow.h/.cpp` | Interfaz de configuración |
 | `main.cpp` | Arranque, bandeja del sistema y cableado |
-| `resources/` | Icono: `icon-NN.png` (uno por tamaño, Qt resource) e `icon.ico` (recurso nativo de Windows) |
+| `resources/` | Icono: `icon-NN.png` (uno por tamaño, Qt resource), `icon.ico` (Windows) e `icon.icns` (macOS) |
+| `installer/` | Script de Inno Setup (Windows), `Info.plist.in` (macOS) y `.desktop` (Linux) |
 | `docs/Guia-de-uso.pdf` | Manual de usuario que se empaqueta con el instalador |
 
 Sin dependencias externas más allá de Qt y, en Linux, libX11.
