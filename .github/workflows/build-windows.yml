@@ -1,0 +1,99 @@
+name: Compilar para Windows
+
+on:
+  push:
+    branches: [main, master]
+    tags: ['v*']
+  workflow_dispatch:
+
+env:
+  QT_VERSION: 6.8.3
+  QT_ARCH: win64_msvc2022_64
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    # Carpeta del repositorio donde está CMakeLists.txt.
+    # Si algún día mueves el proyecto a la raíz, cambia esto por un punto: .
+    defaults:
+      run:
+        working-directory: pngtuber
+
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - name: Preparar Python (necesario para aqtinstall)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Instalar Qt para Windows
+        shell: pwsh
+        run: |
+          pip install aqtinstall
+          aqt install-qt windows desktop $env:QT_VERSION $env:QT_ARCH --outputdir ${{ github.workspace }}\Qt
+          echo "QT_DIR=${{ github.workspace }}\Qt\$env:QT_VERSION\msvc2022_64" >> $env:GITHUB_ENV
+
+      - name: Configurar y compilar
+        shell: pwsh
+        run: |
+          cmake -B build -G "Visual Studio 17 2022" -A x64 `
+                -DCMAKE_PREFIX_PATH="$env:QT_DIR"
+          cmake --build build --config Release --parallel
+
+      - name: Empaquetar con las DLL de Qt
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist\PngtuberDesktop | Out-Null
+          Copy-Item build\Release\pngtuber.exe dist\PngtuberDesktop\
+          Copy-Item README.md dist\PngtuberDesktop\LEEME.md
+          & "$env:QT_DIR\bin\windeployqt.exe" `
+              --release --no-translations --no-system-d3d-compiler --no-opengl-sw `
+              dist\PngtuberDesktop\pngtuber.exe
+
+      - name: Comprobar que el ejecutable arranca
+        shell: pwsh
+        run: |
+          # Arranca la app 8 segundos: si falta una DLL, el proceso muere
+          # de inmediato y este paso falla con un mensaje claro.
+          $p = Start-Process dist\PngtuberDesktop\pngtuber.exe -PassThru
+          Start-Sleep -Seconds 8
+          if ($p.HasExited) {
+            Write-Error "El ejecutable se cerró solo (código $($p.ExitCode)). Falta alguna dependencia."
+            exit 1
+          }
+          Stop-Process -Id $p.Id -Force
+          Write-Host "El ejecutable arranca correctamente."
+
+      - name: Crear el ZIP portable
+        shell: pwsh
+        run: |
+          Compress-Archive -Path dist\PngtuberDesktop -DestinationPath PngtuberDesktop-portable-win64.zip
+
+      - name: Crear el instalador
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress -y
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" `
+              /DSourceDir="${{ github.workspace }}\pngtuber\dist\PngtuberDesktop" `
+              /O"${{ github.workspace }}\pngtuber" `
+              installer\pngtuber.iss
+
+      - name: Subir los resultados
+        uses: actions/upload-artifact@v4
+        with:
+          name: PngtuberDesktop-windows
+          path: |
+            pngtuber/PngtuberDesktop-portable-win64.zip
+            pngtuber/PngtuberDesktop-Setup.exe
+          retention-days: 30
+
+      - name: Publicar Release (sólo al crear una etiqueta v*)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            pngtuber/PngtuberDesktop-portable-win64.zip
+            pngtuber/PngtuberDesktop-Setup.exe
