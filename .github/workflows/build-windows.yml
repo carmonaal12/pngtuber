@@ -12,7 +12,8 @@ env:
 
 jobs:
   build:
-    runs-on: windows-latest
+    
+    runs-on: windows-2022      
 
     # Carpeta del repositorio donde está CMakeLists.txt.
     # Si algún día mueves el proyecto a la raíz, cambia esto por un punto: .
